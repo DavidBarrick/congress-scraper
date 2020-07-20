@@ -1,0 +1,119 @@
+# Welcome to Serverless!
+#
+# This file is the main config file for your service.
+# It's very minimal at this point and uses default values.
+# You can always add more config options for more control.
+# We've included some commented out config examples here.
+# Just uncomment any of them to get that config option.
+#
+# For full config options, check the docs:
+#    docs.serverless.com
+#
+# Happy Coding!
+
+service: congress-scraper
+
+custom:
+  bucket: "congress-${sls:instanceId}-${opt:stage, 'dev'}"
+  timeout: 300
+
+provider:
+  name: aws
+  runtime: nodejs12.x
+  timeout: ${self:custom.timeout}
+  environment:
+    PC_BILL_TYPE_UPDATE_QUEUE_URL: 
+      Fn::Join:
+        - "/"
+        - - "https://sqs.us-east-1.amazonaws.com"
+          - Ref: 'AWS::AccountId'
+          - Fn::GetAtt:
+              - BillTypeUpdateQueue
+              - QueueName
+    PC_BILL_UPDATE_QUEUE_URL: 
+      Fn::Join:
+        - "/"
+        - - "https://sqs.us-east-1.amazonaws.com"
+          - Ref: 'AWS::AccountId'
+          - Fn::GetAtt:
+              - BillUpdateQueue
+              - QueueName
+    PC_BUCKET: ${self:custom.bucket}
+  tracing:
+    lambda: true
+  iamRoleStatements:
+    - Effect: "Allow"
+      Action:
+        - "s3:ListBucket"
+      Resource: "arn:aws:s3:::${self:custom.bucket}"
+    - Effect: "Allow"
+      Action:
+        - "s3:PutObject"
+        - "s3:GetObject"
+      Resource: "arn:aws:s3:::${self:custom.bucket}/*"
+    - Effect: "Allow"
+      Action:
+        - "sqs:*"
+      Resource:
+        - Fn::GetAtt:
+          - BillTypeUpdateQueue
+          - Arn
+        - Fn::GetAtt:
+          - BillUpdateQueue
+          - Arn
+
+resources:
+  Resources:
+    BillTypeUpdateQueue:
+      Type: "AWS::SQS::Queue"
+      Properties:
+        VisibilityTimeout: ${self:custom.timeout}
+        QueueName:
+          Fn::Join:
+            - "-"
+            - - "BillTypeUpdateQueue"
+              - ${sls:instanceId}
+              - ${opt:stage, 'dev'}
+    BillUpdateQueue:
+      Type: "AWS::SQS::Queue"
+      Properties:
+        VisibilityTimeout: ${self:custom.timeout}
+        QueueName: 
+          Fn::Join:
+            - "-"
+            - - "BillUpdateQueue"
+              - ${sls:instanceId}
+              - ${opt:stage, 'dev'}
+
+functions:
+  fetchBills:
+    handler: fetchBills.handler
+    #events:
+    #  - schedule: cron(0 2,6,11,14,17,19 ? * * *) #optional cron job refresh
+  processBillTypeUpdate:
+    handler: processBillTypeUpdate.handler
+    batchSize: 1
+    events:
+      - sqs: 
+          arn:
+            Fn::GetAtt:
+              - BillTypeUpdateQueue
+              - Arn
+  processBillUpdate:
+    handler: processBillUpdate.handler
+    batchSize: 10
+    events:
+      - sqs: 
+          arn:
+            Fn::GetAtt:
+              - BillUpdateQueue
+              - Arn
+  transformBill:
+    handler: transformBill.handler
+    events:
+      - s3:
+          bucket: ${self:custom.bucket}
+          event: s3:ObjectCreated:*
+          rules:
+            - prefix: congress/
+            - suffix: .xml
