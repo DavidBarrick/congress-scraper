@@ -39,6 +39,7 @@ module.exports.handler = async (event = {}) => {
 
 async function fetchBill(loc) {
   if(!loc) throw { statusCode: 400, message: "Invalid record: no loc" };
+  console.log("Bill Update: ", loc);
 
   try {
     const res = await request(loc);

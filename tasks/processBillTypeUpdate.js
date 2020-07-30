@@ -7,7 +7,7 @@ const crypto  = require('crypto');
 const s3      = new AWS.S3();
 const sqs     = new AWS.SQS();
 
-const GOVINFO_BASE_URL = "https://www.govinfo.gov/";
+//const GOVINFO_BASE_URL = "https://www.govinfo.gov/";
 //const BULKDATA_SITEMAPINDEX_PATTERN = GOVINFO_BASE_URL + "sitemap/bulkdata/BILLSTATUS/sitemapindex.xml";
 
 const BILL_TYPES = [
@@ -25,7 +25,7 @@ const PC_BUCKET = process.env.PC_BUCKET;
 const PC_BILL_UPDATE_QUEUE_URL = process.env.PC_BILL_UPDATE_QUEUE_URL;
 
 module.exports.handler = async (event = {}) => {
-  console.log("Event: ", JSON.stringify(event, null, 2));
+  //console.log("Event: ", JSON.stringify(event, null, 2));
 
   try {
     const { Records = [] } = event;

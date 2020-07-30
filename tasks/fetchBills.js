@@ -89,7 +89,9 @@ async function processIndexUpdates(server = [], local = []) {
   }
 }
 
-async function queueIndexUpdate(index) {
+async function queueIndexUpdate(index = {}) {
+  console.log("Found Update: ", index.loc);
+
   const params = {
     MessageBody: JSON.stringify(index),
     DelaySeconds: 0,

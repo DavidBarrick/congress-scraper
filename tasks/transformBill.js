@@ -3,6 +3,8 @@
 const xml2js = require('xml2js');
 const AWS    = require('aws-sdk');
 const s3     = new AWS.S3();
+const TurndownService = require('turndown');
+const turndownService = new TurndownService();
 
 const GOVINFO_BASE_URL  = "https://www.govinfo.gov/";
 const BULKDATA_BASE_URL = GOVINFO_BASE_URL + "bulkdata/";
@@ -163,7 +165,7 @@ function summary_for(summariesNode = {}) {
    return {
       "date": updateDate,
       "as": name,
-      "text": strip_tags(text),
+      "text": turndownService.turndown(text)
    }
 }
 
