@@ -21,6 +21,7 @@ provider:
   name: aws
   runtime: nodejs12.x
   timeout: ${self:custom.timeout}
+  logRetentionInDays: 7
   environment:
     PC_BILL_TYPE_UPDATE_QUEUE_URL: 
       Fn::Join:
@@ -93,8 +94,8 @@ resources:
 functions:
   fetchBills:
     handler: tasks/fetchBills.handler
-    #events:
-    #  - schedule: cron(0 2,6,11,14,17,19 ? * * *) #optional cron job refresh
+    events:
+      - schedule: cron(0 2,6,11,14,17,19 ? * * *) #optional cron job refresh
   processBillTypeUpdate:
     handler: tasks/processBillTypeUpdate.handler
     events:

@@ -25,7 +25,7 @@ const PC_BUCKET = process.env.PC_BUCKET;
 const PC_BILL_UPDATE_QUEUE_URL = process.env.PC_BILL_UPDATE_QUEUE_URL;
 
 module.exports.handler = async (event = {}) => {
-  //console.log("Event: ", JSON.stringify(event, null, 2));
+  console.log("Event: ", JSON.stringify(event, null, 2));
 
   try {
     const { Records = [] } = event;
@@ -35,8 +35,8 @@ module.exports.handler = async (event = {}) => {
       for(const record of Records) {
         const { body = "" } = record;
         const sitemapRecord = JSON.parse(body);
-        const { loc, congress, bill_type } = sitemapRecord;
-        validateRecord(congress, bill_type);
+        const { loc, congress, bill_type, updateId } = sitemapRecord;
+        validateRecord(congress, bill_type, updateId);
 
         const { sitemap: serverSitemap, json: serverSitemapJSON } = await fetchServerSitemap(loc);
         const localSitemapJSON = await fetchLocalSitemap(congress, bill_type);
@@ -44,7 +44,7 @@ module.exports.handler = async (event = {}) => {
         const serverIndexes = fetchValidIndexes(congress, bill_type, serverSitemapJSON);
         const localIndexes = fetchValidIndexes(congress, bill_type, localSitemapJSON);
     
-        await processIndexUpdates(serverIndexes, localIndexes);
+        await processIndexUpdates(serverIndexes, localIndexes, updateId);
         await updateSitemap(congress, bill_type, serverSitemap);
       }
     }
@@ -62,8 +62,8 @@ module.exports.handler = async (event = {}) => {
   }
 };
 
-function validateRecord(congress, bill_type) {
-  if(!congress || !bill_type || BILL_TYPES.indexOf(bill_type) === -1) throw { statusCode: 400, message: "Invalid record: " + bill_type };
+function validateRecord(congress, bill_type, updateId) {
+  if(!updateId || !congress || !bill_type || BILL_TYPES.indexOf(bill_type) === -1) throw { statusCode: 400, message: "Invalid record: " + bill_type };
 }
 
 async function fetchServerSitemap(loc) {
@@ -108,18 +108,18 @@ function transformIndex(index, re, congress, bill_type) {
   return { loc, lastmod };
 }
 
-async function processIndexUpdates(server = [], local = []) {
+async function processIndexUpdates(server = [], local = [], updateId) {
   const updates = [];
   for(const serverIndex of server) {
     const localIndex = local.filter(index => index.loc === serverIndex.loc).pop();
     if(!localIndex || localIndex.lastmod !== serverIndex.lastmod) updates.push(serverIndex);
   }
 
-  if(updates.length > 0) return queueIndexUpdates(updates);
+  if(updates.length > 0) return queueIndexUpdates(updateId, updates);
 }
 
-async function queueIndexUpdates(keys = [], batch = 0) {
-  const entries = keys.slice(batch * 10, batch * 10 + 10).map(createSQSEntry);
+async function queueIndexUpdates(updateId, keys = [], batch = 0) {
+  const entries = keys.slice(batch * 10, batch * 10 + 10).map(key => { return createSQSEntry(key, updateId) });
 
   if(entries.length > 0) {
     const params = {
@@ -128,16 +128,16 @@ async function queueIndexUpdates(keys = [], batch = 0) {
     };
   
     await sqs.sendMessageBatch(params).promise();
-    if(batch * 10 + 10 < keys.length) return queueIndexUpdates(keys, batch + 1);
+    if(batch * 10 + 10 < keys.length) return queueIndexUpdates(updateId, keys, batch + 1);
   }
 }
 
-function createSQSEntry(index) {
+function createSQSEntry(index, updateId) {
   const id = crypto.createHash('md5').update(index.loc).digest("hex");
 
   return {
     Id: id,
-    MessageBody: JSON.stringify(index)
+    MessageBody: JSON.stringify({updateId, ...index})
   }
 }
 

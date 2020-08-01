@@ -17,13 +17,14 @@ module.exports.handler = async (event = {}) => {
   console.log("Event: ", JSON.stringify(event, null, 2));
 
   try {
+    const { id } = event;
     const { sitemap: serverSitemap, json: serverSitemapJSON } = await fetchServerSitemap();
     const localSitemapJSON                                    = await fetchLocalSitemap();
 
     const serverIndexes = fetchValidIndexes(serverSitemapJSON);
     const localIndexes  = fetchValidIndexes(localSitemapJSON);
 
-    await processIndexUpdates(serverIndexes, localIndexes);
+    await processIndexUpdates(serverIndexes, localIndexes, id);
     await updateSitemap(serverSitemap);
 
     return {
@@ -82,18 +83,17 @@ function transformIndex(index, re) {
   return { loc, lastmod };
 }
 
-async function processIndexUpdates(server = [], local = []) {
+async function processIndexUpdates(server = [], local = [], updateId) {
   for(const serverIndex of server) {
     const localIndex = local.filter(index => index.loc === serverIndex.loc).pop();
-    if(!localIndex || localIndex.lastmod !== serverIndex.lastmod) await queueIndexUpdate(serverIndex);
+    if(!localIndex || localIndex.lastmod !== serverIndex.lastmod) await queueIndexUpdate(serverIndex, updateId);
   }
 }
 
-async function queueIndexUpdate(index = {}) {
+async function queueIndexUpdate(index = {}, updateId) {
   console.log("Found Update: ", index.loc);
-
   const params = {
-    MessageBody: JSON.stringify(index),
+    MessageBody: JSON.stringify({ updateId, ...index }),
     DelaySeconds: 0,
     QueueUrl: PC_BILL_TYPE_UPDATE_QUEUE_URL
   };

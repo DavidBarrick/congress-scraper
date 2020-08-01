@@ -8,7 +8,7 @@ const s3      = new AWS.S3();
 const PC_BUCKET = process.env.PC_BUCKET;
 
 module.exports.handler = async (event = {}) => {
-  //console.log("Event: ", JSON.stringify(event, null, 2));
+  console.log("Event: ", JSON.stringify(event, null, 2));
 
   try {
     const { Records = [] } = event;
@@ -17,10 +17,10 @@ module.exports.handler = async (event = {}) => {
       for(const record of Records) {
         const { body = "" } = record;
         const sitemapRecord = JSON.parse(body);
-        const { loc } = sitemapRecord;
+        const { loc, updateId } = sitemapRecord;
 
         const res = await fetchBill(loc);
-        await updateBill(res);
+        await updateBill(res, updateId);
       }
     }
 
@@ -50,10 +50,18 @@ async function fetchBill(loc) {
   }
 }
 
-async function updateBill(res) {
+async function updateBill(res, updateId) {
   const { bill } = await xml2js.parseStringPromise(res, { explicitArray: false, explicitRoot: false });
   const { congress, billType, billNumber } = bill;
   const file = Buffer.from(res);
-  if(file) await s3.upload({ Bucket: PC_BUCKET, Key: `congress/${congress}/${billType.toLowerCase()}/${billNumber}.xml`, Body: file }).promise();
+
+  const params = {
+    Bucket: PC_BUCKET, 
+    Key: `congress/${congress}/${billType.toLowerCase()}/${billNumber}.xml`, 
+    Body: file,
+    Metadata: { updateid: updateId }
+  }
+
+  if(file) await s3.upload(params).promise();
   else console.error("NO BILL");
 }

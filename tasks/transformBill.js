@@ -60,7 +60,7 @@ S3 EVENT SAMPLE
 */
 
 module.exports.handler = async (event = {}) => {
-  //console.log("Event: ", JSON.stringify(event, null, 2));
+  console.log("Event: ", JSON.stringify(event, null, 2));
 
   try {
     const { Records = [] } = event;
@@ -70,9 +70,9 @@ module.exports.handler = async (event = {}) => {
          const { s3 = {} } = record;
          const { bucket: { name: bucketName }, object: { key: objectKey } } = s3;
          if(isValidKey(objectKey)) {
-            const govInfoBill = await fetchBill(bucketName, objectKey);
+            const { bill: govInfoBill, updateId } = await fetchBill(bucketName, objectKey);
             const billJSON = await transformGovInfoBill(govInfoBill);
-            await createBillJSON(bucketName, billJSON);
+            await createBillJSON(bucketName, billJSON, updateId);
          }
       }
     }
@@ -883,12 +883,23 @@ async function transformGovInfoBill(govInfoBill) {
 }
 
 async function fetchBill(bucket, key) {
-  const { Body } = await s3.getObject({ Bucket: bucket, Key: key }).promise();
-  if(Body) return Body.toString();
+  const { Body, Metadata = {} } = await s3.getObject({ Bucket: bucket, Key: key }).promise();
+  const { updateid: updateId } = Metadata;
+  if(Body) return { bill: Body.toString(), updateId };
   else throw { statusCode: 404, message: "Bill not found" };
 }
 
-async function createBillJSON(bucket, bill = {}) {
-  const { congress, bill_type, number } = bill;
-  if(bill) await s3.upload({ Bucket: bucket, Key: `congress/${congress}/${bill_type}/${number}.json`, Body: JSON.stringify(bill), ContentType: "application/json" }).promise();
+async function createBillJSON(bucket, bill = {}, updateId) {
+  const { congress, bill_type, number, bill_id } = bill;
+  console.log(`Transformed Bill: ${bill_id}`);
+
+  const params = {
+   Bucket: bucket, 
+   Key: `congress/${congress}/${bill_type}/${number}.json`, 
+   Body: JSON.stringify({ updateId, ...bill }), 
+   ContentType: "application/json",
+   Metadata: { updateid: updateId }
+ }
+
+  if(bill) await s3.upload(params).promise();
 }
