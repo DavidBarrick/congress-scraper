@@ -18,6 +18,8 @@ module.exports.handler = async (event = {}) => {
 
   try {
     const { id } = event;
+    if(!id) throw { statusCode: 400, message: "UpdateID required" };
+    
     const { sitemap: serverSitemap, json: serverSitemapJSON } = await fetchServerSitemap();
     const localSitemapJSON                                    = await fetchLocalSitemap();
 

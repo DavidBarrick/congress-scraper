@@ -169,11 +169,13 @@ function summary_for(summariesNode = {}) {
    }
 }
 
-function latest_status(actions, introduced_at) {
+function latest_status(actions = [], introduced_at) {
+   if(actions.length === 0) return { }; 
+
    var status = "INTRODUCED";
    var status_date = introduced_at;
 
-   const latestAction = actions.pop();
+   const latestAction = actions[actions.length - 1];
    if(latestAction) {
       status = latestAction["status"];
       status_date = latestAction["acted_at"];
@@ -850,7 +852,7 @@ async function transformGovInfoBill(govInfoBill) {
             relatedBills: relatedBillsNode = {} } = bill_dict;
    const bill_id = build_bill_id(billType.toLowerCase(), billNumber, congress);
    const titles = titles_for(titlesNode);
-   const actions = actions_for(actionsNode, bill_id, current_title_for(titles, 'official'))
+   const actions = actions_for(actionsNode, bill_id, current_title_for(titles, 'official'));
    const { status, status_date } = latest_status(actions, introducedDate);
    const { name: subjects = [] } = policyArea;
    var primary_subject;
@@ -889,7 +891,7 @@ async function fetchBill(bucket, key) {
   else throw { statusCode: 404, message: "Bill not found" };
 }
 
-async function createBillJSON(bucket, bill = {}, updateId) {
+async function createBillJSON(bucket, bill = {}, updateId = "noupdate") {
   const { congress, bill_type, number, bill_id } = bill;
   console.log(`Transformed Bill: ${bill_id}`);
 
